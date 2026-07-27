@@ -2,6 +2,8 @@
 Report Automator Pro — Desktop GUI
 ====================================
 Modern dark-themed desktop application for one-click CAE report generation.
+Supports English / Chinese bilingual toggle.
+
 Uses customtkinter for a sleek industrial-grade UI with threaded backend
 execution to keep the interface responsive during heavy rendering.
 
@@ -35,12 +37,98 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Brand colors for industrial dark theme
-ACCENT = "#E94560"        # coral red accent
-BG_DARK = "#1A1A2E"       # deep navy
-BG_CARD = "#16213E"       # slightly lighter card
-TEXT_PRIMARY = "#E0E0E0"  # light gray
-TEXT_MUTED = "#888888"    # muted gray
+ACCENT = "#E94560"
+ACCENT_HOVER = "#C0392B"
+BG_DARK = "#1A1A2E"
+BG_CARD = "#16213E"
+TEXT_PRIMARY = "#E0E0E0"
+TEXT_MUTED = "#888888"
 SUCCESS_GREEN = "#00C896"
+LANG_TOGGLE_BG = "#2A2A4A"
+
+
+# =========================================================================
+# i18n Dictionary
+# =========================================================================
+
+I18N = {
+    "en": {
+        "app.title": "Report Automator Pro",
+        "app.subtitle": "CAE Post-Processing & PPT Report Generator",
+        "input.label": "Input Data Source",
+        "input.placeholder": "Mock Data (built-in cantilever beam)",
+        "input.hint": "Supports .vtk files or built-in mock data generation.",
+        "input.browse": "Browse",
+        "input.dialog_title": "Select Input File",
+        "btn.generate": "🚀  Generate PPT Report",
+        "btn.running": "⏳  Running...",
+        "progress.label": "Pipeline Status",
+        "status.ready": "Ready",
+        "status.parse": "Parsing mesh data...",
+        "status.render_stress": "GPU off-screen rendering — stress field...",
+        "status.render_disp": "GPU off-screen rendering — displacement field...",
+        "status.render_suite": "Rendering multi-view report suite...",
+        "status.ppt": "Injecting PPT layout & diagnostic text...",
+        "status.done": "Report generation complete!",
+        "status.error": "Error: {error}",
+        "log.ready": "[LOG]  System idle. Ready for task.\n",
+        "log.warn_running": "[WARN] A task is already running. Please wait.",
+        "log.phase1": "[Phase 1/3] Generating mock CAE dataset...",
+        "log.mesh": "  -> Mesh: {nodes:,} nodes, {cells:,} cells",
+        "log.peak": "  -> Peak stress: {stress:.2f} MPa @ node #{idx}",
+        "log.phase2": "[Phase 2/3] Rendering high-resolution images...",
+        "log.stress_done": "  -> stress render complete",
+        "log.disp_done": "  -> displacement render complete",
+        "log.suite_done": "  -> full report suite rendered (5 views)",
+        "log.phase3": "[Phase 3/3] Assembling PowerPoint report...",
+        "log.pptx_saved": "  -> PPTX saved: {path}",
+        "log.pptx_size": "  -> File size: {size:.1f} KB",
+        "log.done": "[DONE] Pipeline finished successfully.",
+        "log.open": "[ACTION] Opening report in PowerPoint...",
+        "log.selected": "Selected: {path}",
+        "statusbar": "Report Automator Pro v1.0  |  CAE Pipeline: Mock → Render → PPT",
+        "btn.lang": "中文",
+        "lang.indicator": "EN",
+    },
+    "zh": {
+        "app.title": "Report Automator Pro — 力学仿真自动化后处理",
+        "app.subtitle": "有限元后处理 · 智能渲染 · PPT 报告一键生成",
+        "input.label": "输入数据源",
+        "input.placeholder": "内置 Mock 数据（悬臂梁模型）",
+        "input.hint": "支持 .vtk / .vtu 文件，或使用内置 Mock 数据生成。",
+        "input.browse": "浏览文件",
+        "input.dialog_title": "选择输入文件",
+        "btn.generate": "🚀  一键生成 PPT 报告",
+        "btn.running": "⏳  正在运行...",
+        "progress.label": "流水线状态",
+        "status.ready": "就绪，等待指令",
+        "status.parse": "正在解析网格数据...",
+        "status.render_stress": "GPU 后台渲染中 — 应力场...",
+        "status.render_disp": "GPU 后台渲染中 — 位移场...",
+        "status.render_suite": "渲染多视角报告图集...",
+        "status.ppt": "正在注入 PPT 版式与诊断文本...",
+        "status.done": "报告生成完毕！",
+        "status.error": "发生错误: {error}",
+        "log.ready": "[就绪]  系统空闲，等待任务指令。\n",
+        "log.warn_running": "[警告] 当前有任务正在运行，请等待完成。",
+        "log.phase1": "[阶段 1/3] 正在生成 Mock CAE 数据集...",
+        "log.mesh": "  -> 网格: {nodes:,} 节点, {cells:,} 单元",
+        "log.peak": "  -> 峰值应力: {stress:.2f} MPa @ 节点 #{idx}",
+        "log.phase2": "[阶段 2/3] 高清离屏渲染进行中...",
+        "log.stress_done": "  -> 应力场渲染完成",
+        "log.disp_done": "  -> 位移场渲染完成",
+        "log.suite_done": "  -> 报告图集渲染完成 (5 张视图)",
+        "log.phase3": "[阶段 3/3] 正在组装 PowerPoint 报告...",
+        "log.pptx_saved": "  -> PPTX 已保存: {path}",
+        "log.pptx_size": "  -> 文件大小: {size:.1f} KB",
+        "log.done": "[完成] 全链路流水线执行成功。",
+        "log.open": "[操作] 正在自动打开 PowerPoint 报告...",
+        "log.selected": "已选择: {path}",
+        "statusbar": "Report Automator Pro v1.0  |  流水线: Mock → 渲染 → PPT",
+        "btn.lang": "English",
+        "lang.indicator": "中文",
+    },
+}
 
 
 # =========================================================================
@@ -48,29 +136,55 @@ SUCCESS_GREEN = "#00C896"
 # =========================================================================
 
 class ReportAutomatorApp(ctk.CTk):
-    """Main GUI window for Report Automator Pro."""
+    """Main GUI window for Report Automator Pro — bilingual EN/ZH."""
 
     def __init__(self):
         super().__init__()
 
-        # -- window config -------------------------------------------------
-        self.title("Report Automator Pro")
-        self.geometry("780x620")
-        self.minsize(680, 540)
+        # -- language state --------------------------------------------------
+        self._lang = "en"
 
-        # Apply dark theme
+        # -- window config ---------------------------------------------------
+        self.title("Report Automator Pro")
+        self.geometry("780x650")
+        self.minsize(680, 560)
+
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
-
-        # Custom color theme overrides
         self.configure(fg_color=BG_DARK)
 
-        # -- state ---------------------------------------------------------
+        # -- runtime state ---------------------------------------------------
         self._running = False
         self._input_file: str | None = None
         self._output_pptx: str | None = None
 
-        # -- build UI ------------------------------------------------------
+        # -- widget registry (for i18n refresh) ------------------------------
+        self._widgets: dict[str, ctk.CTkBaseClass] = {}
+
+        # -- build UI --------------------------------------------------------
+        self._build_all()
+
+    # ------------------------------------------------------------------
+    # i18n helper
+    # ------------------------------------------------------------------
+
+    def _t(self, key: str, **kwargs) -> str:
+        """Look up translated string.  Falls back to English."""
+        text = I18N.get(self._lang, I18N["en"]).get(key, key)
+        if kwargs:
+            return text.format(**kwargs)
+        return text
+
+    def _set_lang(self, lang: str) -> None:
+        """Switch language and refresh all UI text."""
+        self._lang = lang
+        self._refresh_ui()
+
+    # ------------------------------------------------------------------
+    # Full UI construction
+    # ------------------------------------------------------------------
+
+    def _build_all(self) -> None:
         self._build_header()
         self._build_input_section()
         self._build_action_button()
@@ -78,51 +192,87 @@ class ReportAutomatorApp(ctk.CTk):
         self._build_status_bar()
 
     # ------------------------------------------------------------------
-    # UI Sections
+    # Header
     # ------------------------------------------------------------------
 
     def _build_header(self) -> None:
-        """Title + subtitle header."""
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(pady=(30, 10), padx=40, fill="x")
 
-        ctk.CTkLabel(
+        # Title
+        lbl = ctk.CTkLabel(
             header,
-            text="Report Automator Pro",
-            font=ctk.CTkFont(size=28, weight="bold"),
+            text=self._t("app.title"),
+            font=ctk.CTkFont(size=24, weight="bold"),
             text_color=TEXT_PRIMARY,
-        ).pack(anchor="w")
+        )
+        lbl.pack(anchor="w")
+        self._widgets["title"] = lbl
 
-        ctk.CTkLabel(
-            header,
-            text="CAE Post-Processing & PPT Report Generator",
+        # Subtitle row with language toggle
+        sub_row = ctk.CTkFrame(header, fg_color="transparent")
+        sub_row.pack(fill="x", pady=(2, 0))
+
+        lbl2 = ctk.CTkLabel(
+            sub_row,
+            text=self._t("app.subtitle"),
             font=ctk.CTkFont(size=13),
             text_color=TEXT_MUTED,
-        ).pack(anchor="w", pady=(2, 0))
+        )
+        lbl2.pack(side="left")
+        self._widgets["subtitle"] = lbl2
+
+        # Language toggle button (top-right)
+        self._lang_indicator = ctk.CTkLabel(
+            sub_row,
+            text="",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=ACCENT,
+            width=40,
+        )
+        self._lang_indicator.pack(side="right", padx=(0, 8))
+
+        btn_lang = ctk.CTkButton(
+            sub_row,
+            text=self._t("btn.lang"),
+            command=self._on_toggle_lang,
+            width=70,
+            height=28,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=LANG_TOGGLE_BG,
+            hover_color=ACCENT,
+            corner_radius=6,
+        )
+        btn_lang.pack(side="right")
+        self._widgets["btn_lang"] = btn_lang
+        self._lang_indicator.configure(text=self._t("lang.indicator"))
 
         # Divider
-        ctk.CTkFrame(
-            self, height=1, fg_color=TEXT_MUTED
-        ).pack(fill="x", padx=40, pady=(12, 20))
+        ctk.CTkFrame(self, height=1, fg_color=TEXT_MUTED).pack(
+            fill="x", padx=40, pady=(12, 20)
+        )
+
+    # ------------------------------------------------------------------
+    # Input section
+    # ------------------------------------------------------------------
 
     def _build_input_section(self) -> None:
-        """File input row with browse button."""
-        section = ctk.CTkFrame(
-            self, fg_color=BG_CARD, corner_radius=10
-        )
+        section = ctk.CTkFrame(self, fg_color=BG_CARD, corner_radius=10)
         section.pack(pady=(0, 16), padx=40, fill="x", ipady=12)
 
-        ctk.CTkLabel(
+        lbl = ctk.CTkLabel(
             section,
-            text="Input Data Source",
+            text=self._t("input.label"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=TEXT_PRIMARY,
-        ).pack(anchor="w", padx=20, pady=(14, 6))
+        )
+        lbl.pack(anchor="w", padx=20, pady=(14, 6))
+        self._widgets["input_label"] = lbl
 
         row = ctk.CTkFrame(section, fg_color="transparent")
         row.pack(fill="x", padx=20, pady=(0, 14))
 
-        self._input_path_var = ctk.StringVar(value="Mock Data (built-in cantilever beam)")
+        self._input_path_var = ctk.StringVar(value=self._t("input.placeholder"))
         ctk.CTkEntry(
             row,
             textvariable=self._input_path_var,
@@ -132,51 +282,61 @@ class ReportAutomatorApp(ctk.CTk):
             border_color=ACCENT,
         ).pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        ctk.CTkButton(
+        btn = ctk.CTkButton(
             row,
-            text="Browse",
+            text=self._t("input.browse"),
             command=self._on_browse,
             width=90,
             height=36,
             font=ctk.CTkFont(size=12, weight="bold"),
             fg_color=ACCENT,
-            hover_color="#C0392B",
-        ).pack(side="right")
+            hover_color=ACCENT_HOVER,
+        )
+        btn.pack(side="right")
+        self._widgets["btn_browse"] = btn
 
-        ctk.CTkLabel(
+        hint = ctk.CTkLabel(
             section,
-            text="Supports .vtk files or built-in mock data generation.",
+            text=self._t("input.hint"),
             font=ctk.CTkFont(size=11),
             text_color=TEXT_MUTED,
-        ).pack(anchor="w", padx=20, pady=(0, 10))
+        )
+        hint.pack(anchor="w", padx=20, pady=(0, 10))
+        self._widgets["input_hint"] = hint
+
+    # ------------------------------------------------------------------
+    # Action button
+    # ------------------------------------------------------------------
 
     def _build_action_button(self) -> None:
-        """Big 'Generate' CTA button."""
         self._btn_generate = ctk.CTkButton(
             self,
-            text="Generate PPT Report",
+            text=self._t("btn.generate"),
             command=self._on_generate,
             height=52,
             font=ctk.CTkFont(size=16, weight="bold"),
             fg_color=ACCENT,
-            hover_color="#C0392B",
+            hover_color=ACCENT_HOVER,
             corner_radius=10,
         )
         self._btn_generate.pack(pady=(4, 20), padx=40, fill="x")
 
-    def _build_progress_section(self) -> None:
-        """Progress bar + status label."""
-        section = ctk.CTkFrame(
-            self, fg_color=BG_CARD, corner_radius=10
-        )
-        section.pack(pady=(0, 16), padx=40, fill="x", ipady=12)
+    # ------------------------------------------------------------------
+    # Progress section
+    # ------------------------------------------------------------------
 
-        ctk.CTkLabel(
+    def _build_progress_section(self) -> None:
+        section = ctk.CTkFrame(self, fg_color=BG_CARD, corner_radius=10)
+        section.pack(pady=(0, 16), padx=40, fill="both", expand=True, ipady=12)
+
+        lbl = ctk.CTkLabel(
             section,
-            text="Pipeline Status",
+            text=self._t("progress.label"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=TEXT_PRIMARY,
-        ).pack(anchor="w", padx=20, pady=(14, 6))
+        )
+        lbl.pack(anchor="w", padx=20, pady=(14, 6))
+        self._widgets["progress_label"] = lbl
 
         self._progress = ctk.CTkProgressBar(
             section,
@@ -190,13 +350,13 @@ class ReportAutomatorApp(ctk.CTk):
 
         self._status_label = ctk.CTkLabel(
             section,
-            text="Ready",
+            text=self._t("status.ready"),
             font=ctk.CTkFont(size=12),
             text_color=TEXT_MUTED,
         )
         self._status_label.pack(anchor="w", padx=20, pady=(0, 14))
 
-        # Detailed log area
+        # Log area
         self._log_text = ctk.CTkTextbox(
             section,
             height=140,
@@ -206,28 +366,69 @@ class ReportAutomatorApp(ctk.CTk):
             wrap="word",
         )
         self._log_text.pack(fill="both", padx=20, pady=(0, 14), expand=True)
-        self._log_text.insert("end", "  [LOG]  System idle. Ready for task.\n")
+        self._log_text.insert("end", self._t("log.ready"))
+
+    # ------------------------------------------------------------------
+    # Status bar
+    # ------------------------------------------------------------------
 
     def _build_status_bar(self) -> None:
-        """Bottom status bar."""
         bar = ctk.CTkFrame(self, height=28, fg_color=BG_CARD)
         bar.pack(side="bottom", fill="x")
 
-        ctk.CTkLabel(
+        lbl = ctk.CTkLabel(
             bar,
-            text="Report Automator Pro v1.0  |  CAE Pipeline: Mock → Render → PPT",
+            text=self._t("statusbar"),
             font=ctk.CTkFont(size=10),
             text_color=TEXT_MUTED,
-        ).pack(side="left", padx=14, pady=4)
+        )
+        lbl.pack(side="left", padx=14, pady=4)
+        self._widgets["statusbar"] = lbl
+
+    # ------------------------------------------------------------------
+    # i18n refresh — update all dynamic text
+    # ------------------------------------------------------------------
+
+    def _refresh_ui(self) -> None:
+        """Re-apply all translatable strings to widgets."""
+        self._widgets["title"].configure(text=self._t("app.title"))
+        self._widgets["subtitle"].configure(text=self._t("app.subtitle"))
+        self._widgets["input_label"].configure(text=self._t("input.label"))
+        self._widgets["input_hint"].configure(text=self._t("input.hint"))
+        self._widgets["btn_browse"].configure(text=self._t("input.browse"))
+        self._widgets["btn_lang"].configure(text=self._t("btn.lang"))
+        self._widgets["progress_label"].configure(text=self._t("progress.label"))
+        self._widgets["statusbar"].configure(text=self._t("statusbar"))
+        self._lang_indicator.configure(text=self._t("lang.indicator"))
+
+        # Input placeholder
+        if not self._input_file:
+            self._input_path_var.set(self._t("input.placeholder"))
+
+        # Status label
+        if not self._running:
+            self._status_label.configure(text=self._t("status.ready"))
+
+        # Generate button
+        if not self._running:
+            self._btn_generate.configure(text=self._t("btn.generate"))
+
+    # ------------------------------------------------------------------
+    # Language toggle
+    # ------------------------------------------------------------------
+
+    def _on_toggle_lang(self) -> None:
+        new_lang = "zh" if self._lang == "en" else "en"
+        self._set_lang(new_lang)
+        self._log(self._t("log.ready").strip())
 
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
 
     def _on_browse(self) -> None:
-        """Open file dialog to select input .vtk."""
         path = filedialog.askopenfilename(
-            title="Select Input File",
+            title=self._t("input.dialog_title"),
             filetypes=[
                 ("VTK Files", "*.vtk"),
                 ("VTU Files", "*.vtu"),
@@ -237,17 +438,16 @@ class ReportAutomatorApp(ctk.CTk):
         if path:
             self._input_file = path
             self._input_path_var.set(path)
-            self._log(f"Selected: {path}")
+            self._log(self._t("log.selected", path=path))
 
     def _on_generate(self) -> None:
-        """Start the pipeline in a background thread."""
         if self._running:
-            self._log("[WARN] A task is already running. Please wait.")
+            self._log(self._t("log.warn_running"))
             return
 
         self._running = True
         self._btn_generate.configure(
-            text="Running...",
+            text=self._t("btn.running"),
             state="disabled",
             fg_color=TEXT_MUTED,
         )
@@ -257,67 +457,59 @@ class ReportAutomatorApp(ctk.CTk):
         thread.start()
 
     # ------------------------------------------------------------------
-    # Pipeline (runs on background thread)
+    # Pipeline (background thread)
     # ------------------------------------------------------------------
 
     def _run_pipeline(self) -> None:
-        """Execute the full CAE → Render → PPT pipeline."""
+        lang = self._lang  # capture current language for thread
         try:
-            # ---- Phase 1: Data Loading ------------------------------------
-            self._update_status("Parsing mesh data...", 0.05)
-            self._log("[Phase 1/3] Generating mock CAE dataset...")
-            time.sleep(0.3)  # brief delay for UI feel
+            # Phase 1: Data
+            self._update_status(self._t("status.parse"), 0.05)
+            self._log(self._t("log.phase1"))
+            time.sleep(0.3)
 
             data = generate_mock_dataset(seed=42)
             svm = data.stress_von_mises
             idx_peak = int(svm.argmax())
-            self._log(
-                f"  -> Mesh: {data.n_nodes:,} nodes, {data.n_cells:,} cells"
-            )
-            self._log(
-                f"  -> Peak stress: {svm[idx_peak]:.2f} MPa @ node #{idx_peak}"
-            )
+            self._log(self._t("log.mesh", nodes=data.n_nodes, cells=data.n_cells))
+            self._log(self._t("log.peak", stress=svm[idx_peak], idx=idx_peak))
 
-            # ---- Phase 2: GPU Rendering -----------------------------------
-            self._update_status("GPU off-screen rendering in progress...", 0.25)
-            self._log("[Phase 2/3] Rendering high-resolution images...")
-
+            # Phase 2: Render
+            self._update_status(self._t("status.render_stress"), 0.25)
+            self._log(self._t("log.phase2"))
             render_stress(data, OUTPUT_DIR, zoom_to_critical=True)
-            self._log("  -> stress render complete")
-            self._update_status("Rendering displacement field...", 0.40)
+            self._log(self._t("log.stress_done"))
 
+            self._update_status(self._t("status.render_disp"), 0.40)
             render_displacement(data, OUTPUT_DIR, zoom_to_critical=True)
-            self._log("  -> displacement render complete")
-            self._update_status("Rendering report suite...", 0.55)
+            self._log(self._t("log.disp_done"))
 
+            self._update_status(self._t("status.render_suite"), 0.55)
             render_report_suite(data, OUTPUT_DIR)
-            self._log("  -> full report suite rendered (5 views)")
+            self._log(self._t("log.suite_done"))
             self._progress_set(0.65)
 
-            # ---- Phase 3: PPT Assembly ------------------------------------
-            self._update_status("Injecting PPT layout...", 0.70)
-            self._log("[Phase 3/3] Assembling PowerPoint report...")
+            # Phase 3: PPT
+            self._update_status(self._t("status.ppt"), 0.70)
+            self._log(self._t("log.phase3"))
 
             pptx_path = generate_pptx(data, OUTPUT_DIR)
             self._output_pptx = pptx_path
             self._progress_set(0.90)
-            self._log(f"  -> PPTX saved: {pptx_path}")
-            self._log(
-                f"  -> File size: {os.path.getsize(pptx_path)/1024:.1f} KB"
-            )
+            self._log(self._t("log.pptx_saved", path=pptx_path))
+            self._log(self._t("log.pptx_size",
+                size=os.path.getsize(pptx_path) / 1024))
 
-            # ---- Done -----------------------------------------------------
+            # Done
             self._progress_set(1.0)
-            self._update_status("Report generation complete!", 1.0)
-            self._log("[DONE] Pipeline finished successfully.")
-
-            # Auto-open the PPTX
-            self._log("[ACTION] Opening report in PowerPoint...")
+            self._update_status(self._t("status.done"), 1.0)
+            self._log(self._t("log.done"))
+            self._log(self._t("log.open"))
             self.after(500, lambda: os.startfile(pptx_path))
 
         except Exception as exc:
             self._log(f"[ERROR] {exc}")
-            self._update_status(f"Error: {exc}", 0.0)
+            self._update_status(self._t("status.error", error=str(exc)), 0.0)
         finally:
             self._running = False
             self.after(0, self._reset_button)
@@ -327,23 +519,19 @@ class ReportAutomatorApp(ctk.CTk):
     # ------------------------------------------------------------------
 
     def _update_status(self, text: str, progress: float) -> None:
-        """Thread-safe status + progress update."""
         self.after(0, lambda: self._status_label.configure(text=text))
         self.after(0, lambda: self._progress_set(progress))
 
     def _progress_set(self, value: float) -> None:
-        """Set progress bar value."""
         self._progress.set(value)
 
     def _log(self, message: str) -> None:
-        """Append a line to the log textbox (thread-safe)."""
         self.after(0, lambda: self._log_text.insert("end", f"  {message}\n"))
         self.after(0, lambda: self._log_text.see("end"))
 
     def _reset_button(self) -> None:
-        """Restore the generate button."""
         self._btn_generate.configure(
-            text="Generate PPT Report",
+            text=self._t("btn.generate"),
             state="normal",
             fg_color=ACCENT,
         )
