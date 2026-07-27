@@ -59,12 +59,13 @@ def run_odb_extraction(odb_path: str, output_npz: str | None = None) -> str:
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    print(result.stdout)
+    # Always print stdout for debugging
+    if result.stdout:
+        print(result.stdout)
     if result.returncode != 0:
-        print(result.stderr)
-        raise subprocess.CalledProcessError(
-            result.returncode, cmd, output=result.stdout, stderr=result.stderr
-        )
+        err_msg = result.stderr.strip() if result.stderr else f"exit code {result.returncode}"
+        print(f"[ABAQUS ERROR] {err_msg}")
+        raise RuntimeError(f"Abaqus extraction failed:\n{err_msg}")
 
     if not os.path.exists(output_npz):
         raise FileNotFoundError(f"Extraction did not produce {output_npz}")
