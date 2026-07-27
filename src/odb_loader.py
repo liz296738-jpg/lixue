@@ -25,23 +25,11 @@ _ABAQUS_BAT = r"D:\ABAQUS\2025\Commands\abaqus.bat"
 def run_odb_extraction(odb_path: str, output_npz: str | None = None) -> str:
     """
     Call Abaqus Python to extract data from an .odb file.
+    Automatically upgrades old-version ODB files if needed.
 
-    Parameters
-    ----------
-    odb_path : str
-        Path to the .odb file.
-    output_npz : str or None
-        Where to save the .npz.  Default: <odb_path>_extracted.npz
+    Returns path to the generated .npz file.
 
-    Returns
-    -------
-    output_npz : str
-        Path to the generated .npz file.
-
-    Raises
-    ------
-    subprocess.CalledProcessError
-        If Abaqus extraction fails.
+    Raises RuntimeError if extraction fails after all attempts.
     """
     if output_npz is None:
         output_npz = odb_path.replace(".odb", "_extracted.npz")
@@ -51,21 +39,65 @@ def run_odb_extraction(odb_path: str, output_npz: str | None = None) -> str:
         "odb_bridge.py",
     )
 
-    cmd = [
-        _ABAQUS_BAT, "python",
-        bridge_script,
-        odb_path,
-        output_npz,
-    ]
+    def _try_extract(path):
+        cmd = [_ABAQUS_BAT, "python", bridge_script, path, output_npz]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.stdout:
+            print(result.stdout)
+        return result
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    # Always print stdout for debugging
-    if result.stdout:
-        print(result.stdout)
+    # First attempt: extract directly
+    result = _try_extract(odb_path)
+
+    # Check if ODB needs upgrading (old Abaqus version)
+    stderr_text = (result.stderr or "") + (result.stdout or "")
+    if ("previous release" in stderr_text.lower()
+            or "upgrade" in stderr_text.lower()
+            or result.returncode != 0):
+        # Try to auto-upgrade
+        print("[INFO] ODB may be from an older Abaqus version — attempting auto-upgrade...")
+        upgraded_path = odb_path.replace(".odb", "_upgraded.odb")
+        upgrade_cmd = [
+            _ABAQUS_BAT, "-upgrade",
+            "-job", os.path.splitext(os.path.basename(odb_path))[0] + "_upgraded",
+            "-odb", odb_path,
+        ]
+        up_result = subprocess.run(
+            upgrade_cmd, capture_output=True, text=True, timeout=300,
+            cwd=os.path.dirname(odb_path) or ".",
+        )
+        if up_result.returncode == 0 and "COMPLETED" in up_result.stdout:
+            print("[INFO] ODB upgrade succeeded — retrying extraction...")
+            # Find the upgraded file (abaqus puts it in cwd)
+            cwd = os.path.dirname(odb_path) or os.getcwd()
+            for f in os.listdir(cwd):
+                if f.endswith("_upgraded.odb"):
+                    upgraded_path = os.path.join(cwd, f)
+                    break
+            if os.path.exists(upgraded_path):
+                result = _try_extract(upgraded_path)
+                # Clean up temp upgraded file
+                try:
+                    os.remove(upgraded_path)
+                except OSError:
+                    pass
+            else:
+                raise RuntimeError(
+                    f"ODB upgrade ran but upgraded file not found.\n"
+                    f"Upgrade output:\n{up_result.stdout}"
+                )
+        else:
+            # If upgrade itself failed, report original error
+            err = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+            raise RuntimeError(
+                f"Abaqus extraction failed and auto-upgrade did not succeed.\n"
+                f"Original error:\n{err}\n"
+                f"Please manually upgrade: abaqus -upgrade -job <name> -odb <file>"
+            )
+
     if result.returncode != 0:
-        err_msg = result.stderr.strip() if result.stderr else f"exit code {result.returncode}"
-        print(f"[ABAQUS ERROR] {err_msg}")
-        raise RuntimeError(f"Abaqus extraction failed:\n{err_msg}")
+        err = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+        raise RuntimeError(f"Abaqus extraction failed:\n{err}")
 
     if not os.path.exists(output_npz):
         raise FileNotFoundError(f"Extraction did not produce {output_npz}")
