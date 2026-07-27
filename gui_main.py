@@ -23,7 +23,8 @@ sys.path.insert(0, PROJECT_ROOT)
 import tkinter as tk
 import customtkinter as ctk
 from customtkinter import filedialog
-from tkinterdnd2 import TkinterDnD, DND_FILES
+from tkinterdnd2 import DND_FILES
+from tkinterdnd2.TkinterDnD import _require as _require_tkdnd
 
 # -- app modules -----------------------------------------------------------
 from src.mock_data import generate_mock_dataset
@@ -108,7 +109,7 @@ I18N = {
         "input.placeholder": "内置 Mock 数据（悬臂梁模型）",
         "input.hint": "支持 .vtk / .vtu 文件，或使用内置 Mock 数据生成。",
         "input.browse": "浏览文件",
-        "drop.placeholder": "拖拽 .odb / .npz / .vtk 文件到此处\n（或点击"浏览文件"选择）",
+        "drop.placeholder": "拖拽 .odb / .npz / .vtk 文件到此处\n（或点击 [浏览文件] 选择）",
         "drop.hover": "松开鼠标以加载文件",
         "input.dialog_title": "选择输入文件",
         "btn.generate": "🚀  一键生成 PPT 报告",
@@ -154,11 +155,17 @@ I18N = {
 # Main Application
 # =========================================================================
 
-class ReportAutomatorApp(TkinterDnD.Tk):
+class ReportAutomatorApp(ctk.CTk):
     """Main GUI window for Report Automator Pro — bilingual EN/ZH with drag-and-drop."""
 
     def __init__(self):
         super().__init__()
+
+        # Load tkdnd Tcl package for drag-and-drop support
+        try:
+            _require_tkdnd(self)
+        except (tk.TclError, Exception):
+            pass  # tkdnd not available — drag-and-drop disabled
 
         # -- language state --------------------------------------------------
         self._lang = "en"
