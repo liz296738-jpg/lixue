@@ -17,3 +17,7 @@ from .ppt_generator import (
     generate_pptx,
     generate_full_report,
 )
+from .odb_loader import (
+    run_odb_extraction,
+    load_npz_to_mesh,
+)

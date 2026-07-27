@@ -27,6 +27,7 @@ from customtkinter import filedialog
 from src.mock_data import generate_mock_dataset
 from src.renderer import render_stress, render_displacement, render_report_suite
 from src.ppt_generator import generate_pptx
+from src.odb_loader import run_odb_extraction, load_npz_to_mesh
 
 
 # =========================================================================
@@ -86,6 +87,12 @@ I18N = {
         "log.done": "[DONE] Pipeline finished successfully.",
         "log.open": "[ACTION] Opening report in PowerPoint...",
         "log.selected": "Selected: {path}",
+        "log.odb_detected": "  -> Detected .odb file -- launching Abaqus extraction...",
+        "log.odb_running": "  -> Running: abaqus python odb_bridge.py ...",
+        "log.odb_done": "  -> Extraction complete: {path}",
+        "log.odb_loaded": "  -> ODB data loaded into pipeline",
+        "log.npz_loading": "  -> Loading pre-extracted data: {path}",
+        "log.npz_loaded": "  -> NPZ data loaded into pipeline",
         "statusbar": "Report Automator Pro v1.0  |  CAE Pipeline: Mock → Render → PPT",
         "btn.lang": "中文",
         "lang.indicator": "EN",
@@ -124,6 +131,12 @@ I18N = {
         "log.done": "[完成] 全链路流水线执行成功。",
         "log.open": "[操作] 正在自动打开 PowerPoint 报告...",
         "log.selected": "已选择: {path}",
+        "log.odb_detected": "  -> 检测到 .odb 文件 -- 启动 Abaqus 数据提取...",
+        "log.odb_running": "  -> 执行: abaqus python odb_bridge.py ...",
+        "log.odb_done": "  -> 提取完成: {path}",
+        "log.odb_loaded": "  -> ODB 数据已加载至流水线",
+        "log.npz_loading": "  -> 加载预提取数据: {path}",
+        "log.npz_loaded": "  -> NPZ 数据已加载至流水线",
         "statusbar": "Report Automator Pro v1.0  |  流水线: Mock → 渲染 → PPT",
         "btn.lang": "English",
         "lang.indicator": "中文",
@@ -430,8 +443,10 @@ class ReportAutomatorApp(ctk.CTk):
         path = filedialog.askopenfilename(
             title=self._t("input.dialog_title"),
             filetypes=[
+                ("ABAQUS ODB", "*.odb"),
                 ("VTK Files", "*.vtk"),
                 ("VTU Files", "*.vtu"),
+                ("NPZ (pre-extracted)", "*.npz"),
                 ("All Files", "*.*"),
             ],
         )
@@ -466,9 +481,29 @@ class ReportAutomatorApp(ctk.CTk):
             # Phase 1: Data
             self._update_status(self._t("status.parse"), 0.05)
             self._log(self._t("log.phase1"))
-            time.sleep(0.3)
 
-            data = generate_mock_dataset(seed=42)
+            input_path = self._input_file
+            if input_path and input_path.lower().endswith(".odb"):
+                # ----- ABAQUS .odb -> extraction via Abaqus Python ----------
+                self._log(self._t("log.odb_detected"))
+                npz_path = input_path.replace(".odb", "_extracted.npz")
+                self._log(self._t("log.odb_running"))
+                self._progress_set(0.08)
+                run_odb_extraction(input_path, npz_path)
+                self._log(self._t("log.odb_done", path=npz_path))
+                self._progress_set(0.15)
+                data = load_npz_to_mesh(npz_path)
+                self._log(self._t("log.odb_loaded"))
+            elif input_path and input_path.lower().endswith(".npz"):
+                # ----- Pre-extracted .npz -----------------------------------
+                self._log(self._t("log.npz_loading", path=input_path))
+                data = load_npz_to_mesh(input_path)
+                self._log(self._t("log.npz_loaded"))
+            else:
+                # ----- Mock data (built-in) ---------------------------------
+                time.sleep(0.3)
+                data = generate_mock_dataset(seed=42)
+
             svm = data.stress_von_mises
             idx_peak = int(svm.argmax())
             self._log(self._t("log.mesh", nodes=data.n_nodes, cells=data.n_cells))
