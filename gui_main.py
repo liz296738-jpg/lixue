@@ -20,8 +20,10 @@ from pathlib import Path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
+import tkinter as tk
 import customtkinter as ctk
 from customtkinter import filedialog
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 # -- app modules -----------------------------------------------------------
 from src.mock_data import generate_mock_dataset
@@ -87,6 +89,8 @@ I18N = {
         "log.done": "[DONE] Pipeline finished successfully.",
         "log.open": "[ACTION] Opening report in PowerPoint...",
         "log.selected": "Selected: {path}",
+        "drop.placeholder": "Drag & drop .odb / .npz / .vtk file here\n(or click Browse to select)",
+        "drop.hover": "Release to load file",
         "log.odb_detected": "  -> Detected .odb file -- launching Abaqus extraction...",
         "log.odb_running": "  -> Running: abaqus python odb_bridge.py ...",
         "log.odb_done": "  -> Extraction complete: {path}",
@@ -104,6 +108,8 @@ I18N = {
         "input.placeholder": "内置 Mock 数据（悬臂梁模型）",
         "input.hint": "支持 .vtk / .vtu 文件，或使用内置 Mock 数据生成。",
         "input.browse": "浏览文件",
+        "drop.placeholder": "拖拽 .odb / .npz / .vtk 文件到此处\n（或点击"浏览文件"选择）",
+        "drop.hover": "松开鼠标以加载文件",
         "input.dialog_title": "选择输入文件",
         "btn.generate": "🚀  一键生成 PPT 报告",
         "btn.running": "⏳  正在运行...",
@@ -148,8 +154,8 @@ I18N = {
 # Main Application
 # =========================================================================
 
-class ReportAutomatorApp(ctk.CTk):
-    """Main GUI window for Report Automator Pro — bilingual EN/ZH."""
+class ReportAutomatorApp(TkinterDnD.Tk):
+    """Main GUI window for Report Automator Pro — bilingual EN/ZH with drag-and-drop."""
 
     def __init__(self):
         super().__init__()
@@ -282,6 +288,34 @@ class ReportAutomatorApp(ctk.CTk):
         lbl.pack(anchor="w", padx=20, pady=(14, 6))
         self._widgets["input_label"] = lbl
 
+        # ---- Drag & Drop zone ----------------------------------------------
+        self._drop_zone = tk.Frame(
+            section,
+            bg=BG_DARK,
+            highlightbackground=ACCENT,
+            highlightthickness=2,
+            cursor="hand2",
+        )
+        self._drop_zone.pack(fill="x", padx=20, pady=(4, 8), ipady=22)
+
+        # Register as DnD target
+        self._drop_zone.drop_target_register(DND_FILES)
+        self._drop_zone.dnd_bind("<<DragEnter>>", self._on_drop_enter)
+        self._drop_zone.dnd_bind("<<DragLeave>>", self._on_drop_leave)
+        self._drop_zone.dnd_bind("<<Drop>>", self._on_drop)
+
+        self._drop_label = tk.Label(
+            self._drop_zone,
+            text=self._t("drop.placeholder"),
+            font=("Segoe UI", 12),
+            fg=TEXT_MUTED,
+            bg=BG_DARK,
+            justify="center",
+        )
+        self._drop_label.pack(expand=True)
+        self._widgets["drop_label"] = self._drop_label
+
+        # ---- File path row -------------------------------------------------
         row = ctk.CTkFrame(section, fg_color="transparent")
         row.pack(fill="x", padx=20, pady=(0, 14))
 
@@ -417,6 +451,10 @@ class ReportAutomatorApp(ctk.CTk):
         # Input placeholder
         if not self._input_file:
             self._input_path_var.set(self._t("input.placeholder"))
+            self._drop_label.configure(
+                fg=TEXT_MUTED,
+                text=self._t("drop.placeholder"),
+            )
 
         # Status label
         if not self._running:
@@ -451,9 +489,53 @@ class ReportAutomatorApp(ctk.CTk):
             ],
         )
         if path:
-            self._input_file = path
-            self._input_path_var.set(path)
-            self._log(self._t("log.selected", path=path))
+            self._set_input_file(path)
+
+    # ------------------------------------------------------------------
+    # Drag & Drop handlers
+    # ------------------------------------------------------------------
+
+    def _on_drop_enter(self, event) -> None:
+        self._drop_zone.configure(highlightbackground=SUCCESS_GREEN, highlightthickness=3)
+        self._drop_label.configure(fg=SUCCESS_GREEN, text=self._t("drop.hover"))
+
+    def _on_drop_leave(self, event) -> None:
+        self._drop_zone.configure(highlightbackground=ACCENT, highlightthickness=2)
+        self._drop_label.configure(fg=TEXT_MUTED, text=self._t("drop.placeholder"))
+
+    def _on_drop(self, event) -> None:
+        """Handle file drop — extract the first valid file path."""
+        self._on_drop_leave(event)  # reset visuals
+
+        # tkinterdnd2 wraps paths in {} on Windows; strip them
+        raw = event.data.strip()
+        if raw.startswith("{") and raw.endswith("}"):
+            raw = raw[1:-1]
+
+        # Handle multi-file drop: take the first valid CAE file
+        paths = [p.strip() for p in raw.split("} {") if p.strip()]
+        valid_exts = (".odb", ".npz", ".vtk", ".vtu")
+        for p in paths:
+            pl = p.lower()
+            if any(pl.endswith(ext) for ext in valid_exts):
+                self._set_input_file(p)
+                return
+
+        # If no recognized extension, take the first file anyway
+        if paths:
+            self._set_input_file(paths[0])
+
+    def _set_input_file(self, path: str) -> None:
+        """Update UI state when a file is selected (by browse or drop)."""
+        self._input_file = path
+        self._input_path_var.set(path)
+        self._log(self._t("log.selected", path=path))
+        # Show filename + type badge in drop zone
+        ext = os.path.splitext(path)[1].upper().replace(".", "")
+        self._drop_label.configure(
+            fg=SUCCESS_GREEN,
+            text=f"[{ext}]  {os.path.basename(path)}",
+        )
 
     def _on_generate(self) -> None:
         if self._running:
