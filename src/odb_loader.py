@@ -103,22 +103,30 @@ def load_npz_to_mesh(npz_path: str) -> MeshData:
 
     # -- Stress ------------------------------------------------------------
     svm = archive.get("stress_vm", np.zeros(n_nodes, dtype=np.float32))
-    stensor = archive.get(
+    stensor_raw = archive.get(
         "stress_tensor",
         np.zeros((n_nodes, 6), dtype=np.float32),
     )
+    # Pad stress tensor to 6 columns if 2D (4 columns: S11,S22,S33,S12)
+    n_stress_cols = stensor_raw.shape[1]
+    if n_stress_cols < 6:
+        stensor = np.zeros((n_nodes, 6), dtype=np.float64)
+        stensor[:, :n_stress_cols] = stensor_raw
+    else:
+        stensor = stensor_raw.astype(np.float64)
 
     # -- Displacement ------------------------------------------------------
-    disp = archive.get("displacement", np.zeros((n_nodes, 3), dtype=np.float32))
-    disp_mag = archive.get(
-        "disp_mag",
-        np.linalg.norm(disp, axis=1) if disp is not None else np.zeros(n_nodes),
-    )
+    disp_raw = archive.get("displacement", np.zeros((n_nodes, 3), dtype=np.float32))
+    n_disp_cols = disp_raw.shape[1]
+    if n_disp_cols < 3:
+        disp = np.zeros((n_nodes, 3), dtype=np.float64)
+        disp[:, :n_disp_cols] = disp_raw
+    else:
+        disp = disp_raw.astype(np.float64)
+    disp_mag = archive.get("disp_mag", np.linalg.norm(disp, axis=1))
 
-    # -- Principal stresses (simplified 2-D) -------------------------------
-    # Only use in-plane components for a rough estimate
-    sxx, syy, szz = stensor[:, 0], stensor[:, 1], stensor[:, 2]
-    sxy = stensor[:, 3]
+    # -- Principal stresses ------------------------------------------------
+    sxx, syy, sxy = stensor[:, 0], stensor[:, 1], stensor[:, 3]
     s_avg = (sxx + syy) / 2.0
     s_diff = (sxx - syy) / 2.0
     R = np.sqrt(s_diff ** 2 + sxy ** 2)

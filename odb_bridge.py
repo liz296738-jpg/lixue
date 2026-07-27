@@ -88,27 +88,47 @@ def _extract_field(frame, field_id, n_nodes):
     except KeyError:
         print(f"  [WARN] Field '{field_id}' not found")
         return None, None
-    sub_fields = list(fo.values)
-    if not sub_fields:
-        return None, None
-    # Prefer nodal-position data
-    sf = sub_fields[0]
-    for c in sub_fields:
-        if hasattr(c, 'positions') and c.positions is not None:
-            sf = c
     n_comp = len(fo.componentLabels)
+
+    # Try to get nodal-averaged data via bulkDataBlocks
     data = np.zeros((n_nodes, n_comp), dtype=np.float32)
-    for entry in sf.values:
-        nl = entry.nodeLabel
-        if 1 <= nl <= n_nodes:
-            data[nl - 1] = entry.data[:n_comp]
+    count = 0
+
+    # Abaqus stores field data in bulkDataBlocks (efficient array access)
+    for blk in fo.bulkDataBlocks:
+        blk_data = blk.data       # ndarray (M, n_comp)
+        blk_labels = blk.nodeLabels  # ndarray (M,)
+        if blk_labels is None or len(blk_labels) == 0:
+            # Might be element-based; try elementLabels
+            blk_labels = blk.elementLabels
+            if blk_labels is None:
+                continue
+        for i in range(len(blk_labels)):
+            nl = blk_labels[i]
+            if nl is not None and 1 <= nl <= n_nodes:
+                data[nl - 1] = blk_data[i, :n_comp]
+                count += 1
+
+    print(f"  -> {field_id}: {count:,} node values extracted ({n_comp} components)")
     return data, fo.componentLabels
 
 def _compute_von_mises(stress_tensor):
     if stress_tensor is None:
         return None
     s = stress_tensor
-    vm = np.sqrt(0.5 * ((s[:,0]-s[:,1])**2 + (s[:,1]-s[:,2])**2 + (s[:,2]-s[:,0])**2 + 6*(s[:,3]**2+s[:,4]**2+s[:,5]**2)))
+    n_comp = s.shape[1]
+    if n_comp >= 6:
+        # 3D: S11,S22,S33,S12,S13,S23
+        vm = np.sqrt(0.5 * ((s[:,0]-s[:,1])**2 + (s[:,1]-s[:,2])**2 +
+                             (s[:,2]-s[:,0])**2 + 6*(s[:,3]**2+s[:,4]**2+s[:,5]**2)))
+    elif n_comp == 4:
+        # 2D plane stress: S11,S22,S33,S12  (S33=0 for plane stress, but Abaqus may include it)
+        vm = np.sqrt(s[:,0]**2 - s[:,0]*s[:,1] + s[:,1]**2 + 3*s[:,3]**2)
+    elif n_comp == 3:
+        # 2D plane stress minimal: S11,S22,S12
+        vm = np.sqrt(s[:,0]**2 - s[:,0]*s[:,1] + s[:,1]**2 + 3*s[:,2]**2)
+    else:
+        vm = np.zeros(len(s), dtype=np.float32)
     return vm
 
 def extract_odb(odb_path, output_path):
