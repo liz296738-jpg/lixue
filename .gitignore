@@ -18,3 +18,8 @@ Thumbs.db
 # Output images (large binaries — regenerate with scripts)
 output/*.png
 output/*.pptx
+
+# PyInstaller artifacts
+*.spec
+dist/
+build/
